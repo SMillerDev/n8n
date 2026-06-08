@@ -17,12 +17,10 @@ import { WorkflowCreationService } from '@/workflows/workflow-creation.service';
 import { CredentialImporter } from '../entities/credential/credential-importer';
 import { resolvedBindingsToSummaries } from '../entities/credential/credential.types';
 import { WorkflowSerializer } from '../entities/workflow/workflow.serializer';
-import { TarPackageReader } from '../io/tar/tar-package-reader';
+import { TarPackageReader, type TarReaderLimits } from '../io/tar/tar-package-reader';
 import type { ImportPackageRequest, ImportResult, PreparedWorkflow } from '../n8n-packages.types';
 import { packageManifestSchema } from '../spec/manifest.schema';
 import type { SerializedWorkflow } from '../spec/serialized/workflow.schema';
-
-const MEGABYTE_IN_BYTES = 1024 * 1024;
 
 interface ImportTarget {
 	projectId: string;
@@ -31,7 +29,7 @@ interface ImportTarget {
 
 @Service()
 export class ImportPipeline {
-	private readonly maxUncompressedPackageBytes: number;
+	private readonly readerLimits: TarReaderLimits;
 
 	constructor(
 		private readonly workflowSerializer: WorkflowSerializer,
@@ -43,11 +41,11 @@ export class ImportPipeline {
 		private readonly folderService: FolderService,
 		private readonly eventService: EventService,
 	) {
-		this.maxUncompressedPackageBytes = globalConfig.endpoints.payloadSizeMax * MEGABYTE_IN_BYTES;
+		this.readerLimits = globalConfig.packageImport;
 	}
 
 	async run(request: ImportPackageRequest): Promise<ImportResult> {
-		const reader = new TarPackageReader(request.packageBuffer, this.maxUncompressedPackageBytes);
+		const reader = new TarPackageReader(request.packageBuffer, this.readerLimits);
 
 		const manifest = await this.loadPackageManifest(reader);
 
